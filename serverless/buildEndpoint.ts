@@ -1,13 +1,21 @@
+type ErrorInfo = {
+	message: string,
+	code: number
+}
 
 export function withErrorHandling<T extends (...args: any[]) => Promise<Response>>(
     fn: T,
-    errorHandler: (error: any) => Response
+    errorHandler: (error: Error) => ErrorInfo
 ) {
 	return async function(...args: Parameters<T>): Promise<Response> {
 		try {
 			return await fn(...args); // Await the result directly
 		} catch (error) {
-            return errorHandler(error)
+			if (error instanceof Error) {
+				const response = errorHandler(error);
+            	return JSONResponse({message: response.message, status: response.code})
+			}
+			else return JSONResponse({message: "server error", status: 500});
 		}
 	};
 }
@@ -46,7 +54,7 @@ type Middleware<Controller> = (handler: PreMiddleWareRouteHandler<Controller>) =
 
 interface RouterParams<Controller> {
 	middleWare: Middleware<Controller>,
-	errorHandler: (error: Error) => Response,
+	errorHandler: (error: Error) => ErrorInfo,
 	docs_path?: string,
 }
 
@@ -120,4 +128,5 @@ export class Router<Controller> {
 export namespace Router {
 	export type Handler<Controller> = PreMiddleWareRouteHandler<Controller>
 	export type MiddleWare<Controller> = Middleware<Controller>
+	export const Error = (code: number, message: string): ErrorInfo => {return {code, message}}
 }
